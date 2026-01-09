@@ -22,7 +22,7 @@ EDK II and runs directly in UEFI firmware.
 ---
 
 ## 📂 Project Structure
-
+```
 NekoBoot/
 ├── NekoBoot.c          # Main UEFI application
 ├── NekoBoot.inf        # EDK II module definition
@@ -31,7 +31,7 @@ NekoBoot/
 └── .github/
 └── workflows/
 └── build.yml   # GitHub Actions EFI build
-
+```
 ---
 
 ## 🛠 Building
