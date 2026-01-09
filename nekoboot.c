@@ -7,6 +7,7 @@
 #include <Guid/FileInfo.h>
 #include <Library/UefiBootManagerLib.h>
 
+// draw BMP logo
 EFI_STATUS DrawBmp(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, CHAR16* FileName) {
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
     EFI_FILE_PROTOCOL* Root;
@@ -35,7 +36,7 @@ EFI_STATUS DrawBmp(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, CHAR16
         (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)(Buffer + 54), // BMP pixel data offset
         EfiBltBufferToVideo,
         0, 0, 50, 50,       // dest x, y
-        200, 200, 0        // width, height
+        200, 200, 0         // width, height
     );
 
     FreePool(Buffer);
@@ -46,22 +47,45 @@ EFI_STATUS DrawBmp(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, CHAR16
     return EFI_SUCCESS;
 }
 
-EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
-    DrawBmp(ImageHandle, SystemTable, L"nekologo.bmp");
+// fake boot log animation
+void FakeBootLog() {
+    CHAR16* log[] = {
+        L"[ OK ] Initializing graphics",
+        L"[ OK ] Loading kernel modules",
+        L"[ OK ] Starting network services",
+        L"[ OK ] Mounting filesystems",
+        L"[ OK ] Launching system processes"
+    };
 
-    Print(L"\n========================\n");
-    Print(L"   Booting Neko OS 🐾   \n");
-    Print(L"========================\n");
+    for (int i = 0; i < sizeof(log)/sizeof(log[0]); i++) {
+        Print(L"%s\n", log[i]);
+        gBS->Stall(500000); // 0.5 sec between lines
+    }
+}
 
-    // dots animation
+// dots animation for fun
+void DotsAnimation() {
+    Print(L"Booting Neko OS");
     for (int i=0; i<6; i++) {
-        gBS->Stall(500000); // 0.5 sec
+        gBS->Stall(500000);
         Print(L".");
     }
+    Print(L"\n");
+}
 
-    Print(L"\nLaunching Windows...\n");
+EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
+    // draw logo
+    DrawBmp(ImageHandle, SystemTable, L"nekologo.bmp");
 
-    // Chainload Windows Boot Manager
+    // fake boot log
+    FakeBootLog();
+
+    // dots animation
+    DotsAnimation();
+
+    Print(L"Launching Windows...\n");
+
+    // chainload Windows Boot Manager
     EFI_HANDLE WindowsHandle;
     EFI_STATUS Status = EfiBootManagerLoadOption(
         0,
