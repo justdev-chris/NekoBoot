@@ -1,0 +1,51 @@
+name: Build NekoBoot EFI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git build-essential uuid-dev iasl python3
+
+    - name: Clone EDK II
+      run: |
+        git clone https://github.com/tianocore/edk2.git
+        cd edk2
+        git submodule update --init
+
+    - name: Build BaseTools
+      run: |
+        cd edk2
+        make -C BaseTools
+
+    - name: Setup EDK II environment
+      run: |
+        cd edk2
+        source edksetup.sh
+
+    - name: Copy NekoBoot into EDK II
+      run: |
+        mkdir -p edk2/NekoBoot
+        cp NekoBoot.c NekoBoot.inf nekologo.bmp edk2/NekoBoot/
+
+    - name: Build NekoBoot EFI
+      run: |
+        cd edk2
+        source edksetup.sh
+        build -a X64 -t GCC5 -p MdeModulePkg/MdeModulePkg.dsc -m NekoBoot/NekoBoot.inf
+
+    - name: Upload EFI artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NekoBoot.efi
+        path: edk2/Build/MdeModule/DEBUG_GCC5/X64/NekoBoot.efi
