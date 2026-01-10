@@ -8,4 +8,4 @@
   SKUID                   = DEFAULT
 
 [Components]
-  ../NekoBoot.inf
+  NekoBoot/NekoBoot.inf
