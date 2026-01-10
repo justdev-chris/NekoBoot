@@ -39,7 +39,7 @@ jobs:
         build -p NekoPlatform/NekoPlatform.dsc -a X64 -b DEBUG -t GCC5
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: NekoBoot-Build
         path: Build
