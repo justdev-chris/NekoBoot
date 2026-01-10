@@ -50,6 +50,10 @@ jobs:
           cp $EDK_TOOLS_PATH/Conf/tools_def.template $CONF_PATH/tools_def.txt
           cp $EDK_TOOLS_PATH/Conf/target.template $CONF_PATH/target.txt
 
+      - name: Find FileHandleLib
+        run: |
+          find edk2 -name "*FileHandleLib*.inf" 2>/dev/null | head -10
+
       # 6. Build NekoBoot
       - name: Build NekoBoot
         run: |
