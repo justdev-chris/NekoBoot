@@ -55,7 +55,7 @@ jobs:
         run: |
           # Create the NekoBoot folder in edk2 and copy the root files into it
           mkdir -p edk2/NekoBoot
-          cp NekoBoot.inf NekoBoot.c nekoboot.bmp edk2/NekoBoot/
+          cp NekoBoot.inf NekoBoot.c nekologo.bmp edk2/NekoBoot/
 
           # Copy the NekoPlatform folder into edk2
           cp -r NekoPlatform edk2/
