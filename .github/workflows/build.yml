@@ -28,7 +28,8 @@ jobs:
       - name: Setup EDK2 environment
         run: |
           cd edk2
-          source edksetup.sh
+          make -C BaseTools        # Compile BaseTools so 'build' exists
+          source edksetup.sh       # Setup environment variables
           export PATH=$PWD/BaseTools:$PATH
 
       - name: Build NekoBoot EFI
