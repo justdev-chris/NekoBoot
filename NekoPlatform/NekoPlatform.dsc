@@ -11,6 +11,7 @@
 [LibraryClasses]
   UefiLib|MdePkg/Library/UefiLib/UefiLib.inf
   UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
+  PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
 
 [Components]
   NekoBoot/NekoBoot.inf
