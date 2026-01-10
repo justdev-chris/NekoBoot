@@ -17,7 +17,7 @@ jobs:
       PYTHON_COMMAND: python3
 
     steps:
-      # 1. Checkout repo (Your NekoBoot/NekoOS source)
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -45,29 +45,28 @@ jobs:
       # 5. Copy configuration templates
       - name: Copy configuration templates
         run: |
-          # Ensure the Conf directory exists before copying
           mkdir -p $CONF_PATH
           cp $EDK_TOOLS_PATH/Conf/build_rule.template $CONF_PATH/build_rule.txt
           cp $EDK_TOOLS_PATH/Conf/tools_def.template $CONF_PATH/tools_def.txt
           cp $EDK_TOOLS_PATH/Conf/target.template $CONF_PATH/target.txt
 
-      # 6. Build NekoBoot (CORRECTED)
+      # 6. Build NekoBoot (FINAL - Correct for your structure)
       - name: Build NekoBoot
         run: |
-          # Copy your source into the edk2 workspace
-          echo "Copying source files into edk2 workspace..."
-          cp -r ${{ github.workspace }}/NekoBoot edk2/
-          cp -r ${{ github.workspace }}/NekoPlatform edk2/
-          
-          # Navigate and set up environment
+          # Create the NekoBoot folder in edk2 and copy the root files into it
+          mkdir -p edk2/NekoBoot
+          cp NekoBoot.inf NekoBoot.c nekoboot.bmp edk2/NekoBoot/
+
+          # Copy the NekoPlatform folder into edk2
+          cp -r NekoPlatform edk2/
+
+          # Build
           cd edk2
           source edksetup.sh
-          
-          # Run the build
           build -p NekoPlatform/NekoPlatform.dsc -m NekoBoot/NekoBoot.inf -a X64 -t GCC5 -b DEBUG
-          
-          # Optional: List output for verification
-          echo "Build complete. Listing output:"
+
+          # Report
+          echo "Build step finished. Output:"
           find Build -name "*.efi" 2>/dev/null || echo "No .efi file found."
 
       # 7. Upload build artifacts
