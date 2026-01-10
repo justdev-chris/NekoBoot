@@ -1,45 +1,55 @@
-name: Build NekoBoot UEFI
+name: Build NekoBoot
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      WORKSPACE: ${{ github.workspace }}/edk2
+      EDK_TOOLS_PATH: ${{ github.workspace }}/edk2/BaseTools
+      CONF_PATH: ${{ github.workspace }}/edk2/Conf
+      PYTHON_COMMAND: python3
+
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential uuid-dev iasl git python3-apt python3-pip
+      # 2. Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git python3 python3-pip uuid-dev iasl gcc-multilib
 
-    - name: Set EDK2 Environment
-      run: |
-        cd edk2
-        export WORKSPACE=$(pwd)
-        export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
-        export CONF_PATH=$WORKSPACE/Conf
+      # 3. Build BaseTools
+      - name: Build BaseTools
+        run: |
+          cd edk2/BaseTools
+          make -C Source/C
+          cd ${{ github.workspace }}
 
-    - name: Build BaseTools
-      run: |
-        cd edk2/BaseTools
-        chmod +x Build.sh
-        ./Build.sh
+      # 4. Copy templates
+      - name: Copy configuration templates
+        run: |
+          cp $EDK_TOOLS_PATH/Conf/build_rule.template $CONF_PATH/build_rule.txt
+          cp $EDK_TOOLS_PATH/Conf/tools_def.template $CONF_PATH/tools_def.txt
+          cp $EDK_TOOLS_PATH/Conf/target.template $CONF_PATH/target.txt
 
-    - name: Build NekoBoot
-      run: |
-        cd edk2
-        source edksetup.sh
-        build -p NekoPlatform/NekoPlatform.dsc -a X64 -b DEBUG -t GCC5
+      # 5. Build NekoBoot
+      - name: Build NekoBoot
+        run: |
+          source $CONF_PATH/BuildEnv.sh
+          build -p NekoPlatform/NekoPlatform.dsc -m NekoBoot/NekoBoot.inf -a X64 -t GCC5 -b DEBUG
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: NekoBoot-Build
-        path: Build
+      # 6. Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NekoBoot-Build
+          path: ${{ github.workspace }}/Build/DEBUG_GCC5/X64/NekoBoot.efi
