@@ -42,18 +42,33 @@ jobs:
           make -C Source/C
           cd ${{ github.workspace }}
 
-      # 5. Copy templates
+      # 5. Copy configuration templates
       - name: Copy configuration templates
         run: |
+          # Ensure the Conf directory exists before copying
+          mkdir -p $CONF_PATH
           cp $EDK_TOOLS_PATH/Conf/build_rule.template $CONF_PATH/build_rule.txt
           cp $EDK_TOOLS_PATH/Conf/tools_def.template $CONF_PATH/tools_def.txt
           cp $EDK_TOOLS_PATH/Conf/target.template $CONF_PATH/target.txt
 
-      # 6. Build NekoBoot
+      # 6. Build NekoBoot (CORRECTED)
       - name: Build NekoBoot
         run: |
-          source $CONF_PATH/BuildEnv.sh
+          # Copy your source into the edk2 workspace
+          echo "Copying source files into edk2 workspace..."
+          cp -r ${{ github.workspace }}/NekoBoot edk2/
+          cp -r ${{ github.workspace }}/NekoPlatform edk2/
+          
+          # Navigate and set up environment
+          cd edk2
+          source edksetup.sh
+          
+          # Run the build
           build -p NekoPlatform/NekoPlatform.dsc -m NekoBoot/NekoBoot.inf -a X64 -t GCC5 -b DEBUG
+          
+          # Optional: List output for verification
+          echo "Build complete. Listing output:"
+          find Build -name "*.efi" 2>/dev/null || echo "No .efi file found."
 
       # 7. Upload build artifacts
       - name: Upload build artifacts
