@@ -1,7 +1,7 @@
 [Defines]
   INF_VERSION           = 0x00010005
   BASE_NAME             = NekoBoot
-  FILE_GUID             = 48fc52f4-c209-417f-b44c-4137a9a2393c
+  FILE_GUID             = b280c2ba-2a00-4ac2-9b91-fb09faa35bc6
   MODULE_TYPE           = UEFI_APPLICATION
   VERSION_STRING        = 1.0
   ENTRY_POINT           = UefiMain
@@ -20,9 +20,11 @@
   MemoryAllocationLib
   BaseMemoryLib
   BaseLib
-  FileHandleLib
   PrintLib
   DebugLib
+  FileHandleLib
+  FrameBufferBltLib
+  BaseUefiDecompressLib
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid
