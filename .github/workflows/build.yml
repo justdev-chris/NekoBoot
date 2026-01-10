@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential uuid-dev iasl git python3-distutils python3-pip
+        sudo apt-get install -y build-essential uuid-dev iasl git python3-apt python3-pip
 
     - name: Set EDK2 Environment
       run: |
