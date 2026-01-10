@@ -1,12 +1,11 @@
 [Defines]
-PlatformName       = NekoPlatform
-PlatformGuid       = 12345678-1234-1234-1234-1234567890ab
-PlatformVersion    = 1.0
-PcdIncludeFile     = NekoPlatformPcd.h
-BuildTarget        = DEBUG
-OutputDirectory    = Build
+  PLATFORM_NAME           = NekoPlatform
+  PLATFORM_GUID           = 87654321-BA09-FEDC-4321-098765FEDCBA
+  DSC_SPECIFICATION       = 0x00010005
+  OUTPUT_DIRECTORY        = Build
+  SUPPORTED_ARCHITECTURES = X64
+  BUILD_TARGETS           = DEBUG
+  SKUID                   = DEFAULT
 
 [Components]
-NekoBoot.inf
-
-[LibraryClasses]
+  ../NekoBoot.inf
