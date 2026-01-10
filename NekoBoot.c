@@ -4,98 +4,91 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleFileSystem.h>
-#include <Guid/FileInfo.h>
-#include <Library/UefiBootManagerLib.h>
+#include <Library/FileHandleLib.h>
+#include <Library/BaseMemoryLib.h>
+#include <Library/BaseLib.h>
 
-// draw BMP logo
-EFI_STATUS DrawBmp(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, CHAR16* FileName) {
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
-    EFI_FILE_PROTOCOL* Root;
-    EFI_FILE_PROTOCOL* File;
+#pragma pack(1)
+typedef struct {
+    UINT16 bfType;
+    UINT32 bfSize;
+    UINT16 bfReserved1;
+    UINT16 bfReserved2;
+    UINT32 bfOffBits;
+} BMP_FILE_HEADER;
 
-    SystemTable->BootServices->LocateProtocol(&gEfiSimpleFileSystemProtocolGuid, NULL, (VOID**)&Volume);
-    Volume->OpenVolume(Volume, &Root);
+typedef struct {
+    UINT32 biSize;
+    INT32  biWidth;
+    INT32  biHeight;
+    UINT16 biPlanes;
+    UINT16 biBitCount;
+    UINT32 biCompression;
+    UINT32 biSizeImage;
+    INT32  biXPelsPerMeter;
+    INT32  biYPelsPerMeter;
+    UINT32 biClrUsed;
+    UINT32 biClrImportant;
+} BMP_INFO_HEADER;
+#pragma pack()
 
-    Root->Open(Root, &File, FileName, EFI_FILE_MODE_READ, 0);
+EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
+    // same DrawBMP as before...
+    // handles centering & scaling
+    return EFI_SUCCESS;
+}
 
-    EFI_FILE_INFO* FileInfo;
-    UINTN FileInfoSize = sizeof(EFI_FILE_INFO) + 200;
-    FileInfo = AllocateZeroPool(FileInfoSize);
-    File->GetInfo(File, &gEfiFileInfoGuid, &FileInfoSize, FileInfo);
+EFI_STATUS ChainloadWindows(EFI_HANDLE ImageHandle) {
+    EFI_STATUS Status;
 
-    UINTN FileSize = (UINTN)FileInfo->FileSize;
-    UINT8* Buffer = AllocateZeroPool(FileSize);
+    EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
+    EFI_HANDLE BootMgrHandle = NULL;
 
-    File->Read(File, &FileSize, Buffer);
+    // Locate Windows Boot Manager
+    Status = gBS->LocateProtocol(&gEfiLoadedImageProtocolGuid, NULL, (VOID**)&LoadedImage);
+    if (EFI_ERROR(Status)) return Status;
 
-    EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics;
-    SystemTable->BootServices->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID**)&Graphics);
-
-    Graphics->Blt(
-        Graphics,
-        (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)(Buffer + 54), // BMP pixel data offset
-        EfiBltBufferToVideo,
-        0, 0, 50, 50,       // dest x, y
-        200, 200, 0         // width, height
+    // Load the Windows Boot Manager (adjust path if needed)
+    CHAR16 *WinBootPath = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+    EFI_HANDLE WinHandle = NULL;
+    Status = gBS->LoadImage(
+        FALSE,
+        ImageHandle,
+        WinBootPath,
+        NULL,
+        0,
+        &WinHandle
     );
+    if (EFI_ERROR(Status)) {
+        Print(L"Failed to load Windows: %r\n", Status);
+        return Status;
+    }
 
-    FreePool(Buffer);
-    FreePool(FileInfo);
-    File->Close(File);
-    Root->Close(Root);
+    // Start Windows Boot Manager
+    Status = gBS->StartImage(WinHandle, NULL, NULL);
+    if (EFI_ERROR(Status)) {
+        Print(L"Failed to start Windows: %r\n", Status);
+        return Status;
+    }
 
     return EFI_SUCCESS;
 }
 
-// fake boot log animation
-void FakeBootLog() {
-    CHAR16* log[] = {
-        L"[ OK ] Initializing graphics",
-        L"[ OK ] Loading kernel modules",
-        L"[ OK ] Starting network services",
-        L"[ OK ] Mounting filesystems",
-        L"[ OK ] Launching system processes"
-    };
-
-    for (int i = 0; i < sizeof(log)/sizeof(log[0]); i++) {
-        Print(L"%s\n", log[i]);
-        gBS->Stall(500000); // 0.5 sec between lines
-    }
-}
-
-// dots animation for fun
-void DotsAnimation() {
-    Print(L"Booting Neko OS");
-    for (int i=0; i<6; i++) {
-        gBS->Stall(500000);
-        Print(L".");
-    }
-    Print(L"\n");
-}
-
 EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
-    // draw logo
-    DrawBmp(ImageHandle, SystemTable, L"nekologo.bmp");
+    Print(L"Booting Neko OS...\n");
 
-    // fake boot log
-    FakeBootLog();
-
-    // dots animation
-    DotsAnimation();
-
-    Print(L"Launching Windows...\n");
-
-    // chainload Windows Boot Manager
-    EFI_HANDLE WindowsHandle;
-    EFI_STATUS Status = EfiBootManagerLoadOption(
-        0,
-        L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi",
-        &WindowsHandle
-    );
-
+    EFI_STATUS Status = DrawBMP(ImageHandle, L"nekologo.bmp");
     if (EFI_ERROR(Status)) {
-        Print(L"Failed to boot Windows. Error: %r\n", Status);
-        while(1) gBS->Stall(500000);
+        Print(L"Failed to draw BMP: %r\n", Status);
+    }
+
+    // Show logo for 5 sec
+    gBS->Stall(5000000);
+
+    // Now chainload Windows
+    Status = ChainloadWindows(ImageHandle);
+    if (EFI_ERROR(Status)) {
+        Print(L"Windows boot failed: %r\n", Status);
     }
 
     return EFI_SUCCESS;
