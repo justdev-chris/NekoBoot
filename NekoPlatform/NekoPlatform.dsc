@@ -27,7 +27,7 @@
   PeCoffExtraActionLib|MdePkg/Library/BasePeCoffExtraActionLibNull/BasePeCoffExtraActionLibNull.inf
   PerformanceLib|MdePkg/Library/BasePerformanceLibNull/BasePerformanceLibNull.inf
   ReportStatusCodeLib|MdePkg/Library/BaseReportStatusCodeLibNull/BaseReportStatusCodeLibNull.inf
-  CapsuleLib|MdePkg/Library/BaseCapsuleLibNull/BaseCapsuleLibNull.inf
+  CapsuleLib|MdePkg/Library/DxeCapsuleLibNull/DxeCapsuleLibNull.inf
   CacheMaintenanceLib|MdePkg/Library/BaseCacheMaintenanceLib/BaseCacheMaintenanceLib.inf
   CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
   HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
