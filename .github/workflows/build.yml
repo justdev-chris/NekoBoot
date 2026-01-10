@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -28,6 +29,7 @@ jobs:
         run: |
           cd edk2
           source edksetup.sh
+          export PATH=$PWD/BaseTools:$PATH
 
       - name: Build NekoBoot EFI
         run: |
