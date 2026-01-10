@@ -1,10 +1,10 @@
 [Defines]
   INF_VERSION           = 0x00010005
   BASE_NAME             = NekoBoot
-  FILE_GUID             = 12345678-ABCD-1234-ABCD-1234567890AB
+  FILE_GUID             = 48fc52f4-c209-417f-b44c-4137a9a2393c
   MODULE_TYPE           = UEFI_APPLICATION
   VERSION_STRING        = 1.0
-  ENTRY_POINT           = NekoBootEntry
+  ENTRY_POINT           = UefiMain
 
 [Sources]
   NekoBoot.c
@@ -12,6 +12,19 @@
 
 [Packages]
   MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
 
 [LibraryClasses]
   UefiLib
+  UefiBootServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  BaseLib
+  FileHandleLib
+  PrintLib
+  DebugLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gEfiLoadedImageProtocolGuid
