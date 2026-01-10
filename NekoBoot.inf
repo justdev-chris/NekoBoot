@@ -1,25 +1,17 @@
 [Defines]
-INF_VERSION = 0x00010006
-BASE_NAME = NekoBoot
-MODULE_TYPE = UEFI_APPLICATION
-ENTRY_POINT = UefiMain
-SUPPORTED_ARCHITECTURES = X64
+  INF_VERSION           = 0x00010005
+  BASE_NAME             = NekoBoot
+  FILE_GUID             = 12345678-ABCD-1234-ABCD-1234567890AB
+  MODULE_TYPE           = UEFI_APPLICATION
+  VERSION_STRING        = 1.0
+  ENTRY_POINT           = NekoBootEntry
 
 [Sources]
-NekoBoot.c
-nekologo.bmp
-
-[Binaries]
-BMP|nekologo.bmp
+  NekoBoot.c
+  nekologo.bmp
 
 [Packages]
-MdePkg/MdePkg.dec
-MdeModulePkg/MdeModulePkg.dec
+  MdePkg/MdePkg.dec
 
 [LibraryClasses]
-UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
-UefiLib|MdePkg/Library/UefiLib/UefiLib.inf
-BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
-BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
-MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
-PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
+  UefiLib
