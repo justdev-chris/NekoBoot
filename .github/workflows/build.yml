@@ -1,44 +1,45 @@
-name: Build NekoBoot EFI
+name: Build NekoBoot UEFI
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential uuid-dev iasl git python3
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential uuid-dev iasl git python3-distutils python3-pip
 
-      - name: Clone and build with EDK2
-        run: |
-          git clone https://github.com/tianocore/edk2.git
-          cd edk2
-          git submodule update --init --recursive
+    - name: Set EDK2 Environment
+      run: |
+        cd edk2
+        export WORKSPACE=$(pwd)
+        export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+        export CONF_PATH=$WORKSPACE/Conf
 
-          # Build BaseTools (THIS CREATES `build`)
-          make -C BaseTools
+    - name: Build BaseTools
+      run: |
+        cd edk2/BaseTools
+        chmod +x Build.sh
+        ./Build.sh
 
-          # Setup environment (MUST be same shell)
-          source edksetup.sh
-          export PATH=$PWD/BaseTools:$PATH
+    - name: Build NekoBoot
+      run: |
+        cd edk2
+        source edksetup.sh
+        build -p NekoPlatform/NekoPlatform.dsc -a X64 -b DEBUG -t GCC5
 
-          # Sanity check
-          which build
-
-          # Build your platform
-          build -p ../NekoBoot/NekoPlatform/NekoPlatform.dsc -a X64 -b DEBUG
-
-      - name: Upload EFI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NekoBoot-EFI
-          path: edk2/Build/**/X64/*.efi
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: NekoBoot-Build
+        path: Build
