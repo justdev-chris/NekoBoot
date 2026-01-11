@@ -23,6 +23,7 @@
   PrintLib
   DebugLib
   FileHandleLib
+  StackCheckLib 
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid
