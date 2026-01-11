@@ -226,14 +226,3 @@ EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *Syste
 
     return EFI_SUCCESS;
 }
-
-// EDK2 Entry Point Wrapper
-EFI_STATUS
-EFIAPI
-_ModuleEntryPoint (
-  IN EFI_HANDLE        ImageHandle,
-  IN EFI_SYSTEM_TABLE  *SystemTable
-  )
-{
-  return UefiMain(ImageHandle, SystemTable);
-}
