@@ -4,11 +4,10 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleFileSystem.h>
-#include <Protocol/LoadedImage.h>           // ADDED for EFI_LOADED_IMAGE_PROTOCOL
+#include <Protocol/LoadedImage.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/BaseLib.h>
 #include <Library/FileHandleLib.h>
-#include <Library/FrameBufferBltLib.h>      // ADDED for FrameBufferBlt function
 
 #pragma pack(1)
 typedef struct {
@@ -124,22 +123,42 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
     DestinationX = (GraphicsOutput->Mode->Info->HorizontalResolution - BmpInfoHeader->biWidth) / 2;
     DestinationY = (GraphicsOutput->Mode->Info->VerticalResolution - BmpInfoHeader->biHeight) / 2;
 
-    // 9. Draw the BMP using FrameBufferBlt
-    Status = FrameBufferBlt (
-        GraphicsOutput->Mode->FrameBufferBase,
-        GraphicsOutput->Mode->Info,
-        PixelData,
+    // 9. Draw the BMP using GraphicsOutput->Blt
+    // Convert 24-bit BGR to 32-bit BGRx pixel format
+    UINTN PixelCount = BmpInfoHeader->biWidth * BmpInfoHeader->biHeight;
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer = AllocatePool(PixelCount * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+    
+    if (BltBuffer == NULL) {
+        Status = EFI_OUT_OF_RESOURCES;
+        goto CLEANUP_BUFFER;
+    }
+    
+    // Convert 24-bit BGR to 32-bit BGRx (UEFI pixel format)
+    UINT8 *Src = PixelData;
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Dst = BltBuffer;
+    for (UINTN i = 0; i < PixelCount; i++) {
+        Dst->Blue  = Src[0];
+        Dst->Green = Src[1];
+        Dst->Red   = Src[2];
+        Dst->Reserved = 0;
+        Src += 3;
+        Dst++;
+    }
+    
+    Status = GraphicsOutput->Blt(
+        GraphicsOutput,
+        BltBuffer,
         EfiBltBufferToVideo,
-        DestinationX,                               // DestinationX
-        DestinationY,                               // DestinationY
-        0,                                          // SourceX
-        0,                                          // SourceY
-        BmpInfoHeader->biWidth,                     // Width
-        BmpInfoHeader->biHeight,                    // Height
-        BmpInfoHeader->biWidth * 3                  // Delta (3 bytes per pixel for 24-bit)
+        0, 0,                                 // SourceX, SourceY
+        DestinationX, DestinationY,           // DestinationX, DestinationY
+        BmpInfoHeader->biWidth,               // Width
+        BmpInfoHeader->biHeight,              // Height
+        0                                     // Delta (0 for BltBuffer)
     );
+    
+    FreePool(BltBuffer);
     if (EFI_ERROR(Status)) {
-        Print(L"FrameBufferBlt failed: %r\n", Status);
+        Print(L"GraphicsOutput->Blt failed: %r\n", Status);
         goto CLEANUP_BUFFER;
     }
 
