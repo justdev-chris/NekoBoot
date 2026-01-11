@@ -4,9 +4,11 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleFileSystem.h>
-#include <Library/FileHandleLib.h>
+#include <Protocol/LoadedImage.h>           // ADDED for EFI_LOADED_IMAGE_PROTOCOL
 #include <Library/BaseMemoryLib.h>
 #include <Library/BaseLib.h>
+#include <Library/FileHandleLib.h>
+#include <Library/FrameBufferBltLib.h>      // ADDED for FrameBufferBlt function
 
 #pragma pack(1)
 typedef struct {
@@ -154,24 +156,22 @@ CLEANUP_FILE:
 
 EFI_STATUS ChainloadWindows(EFI_HANDLE ImageHandle) {
     EFI_STATUS Status;
-
     EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
-    EFI_HANDLE BootMgrHandle = NULL;
+    EFI_HANDLE WinHandle = NULL;
 
-    // Locate Windows Boot Manager
-    Status = gBS->LocateProtocol(&gEfiLoadedImageProtocolGuid, NULL, (VOID**)&LoadedImage);
+    // Locate our own loaded image protocol
+    Status = gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (VOID**)&LoadedImage);
     if (EFI_ERROR(Status)) return Status;
 
-    // Load the Windows Boot Manager (adjust path if needed)
+    // Load the Windows Boot Manager from the same device
     CHAR16 *WinBootPath = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
-    EFI_HANDLE WinHandle = NULL;
     Status = gBS->LoadImage(
-        FALSE,
-        ImageHandle,
-        WinBootPath,
-        NULL,
-        0,
-        &WinHandle
+        FALSE,                    // BootPolicy
+        ImageHandle,              // ParentImageHandle
+        NULL,                     // DevicePath (NULL = use LoadedImage->DeviceHandle)
+        WinBootPath,              // FilePath
+        0,                        // SourceSize
+        &WinHandle                // ImageHandle
     );
     if (EFI_ERROR(Status)) {
         Print(L"Failed to load Windows: %r\n", Status);
