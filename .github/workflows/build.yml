@@ -70,5 +70,5 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NekoBoot-Build
-          path: ${{ github.workspace }}/Build/DEBUG_GCC5/X64/NekoBoot.efi
+          name: NekoBoot
+          path: Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/OUTPUT/NekoBoot.efi
