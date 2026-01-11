@@ -4,7 +4,7 @@
   FILE_GUID             = b280c2ba-2a00-4ac2-9b91-fb09faa35bc6
   MODULE_TYPE           = UEFI_APPLICATION
   VERSION_STRING        = 1.0
-  ENTRY_POINT           = _ModuleEntryPoint
+  ENTRY_POINT           = UefiMain
 
 [Sources]
   NekoBoot.c
@@ -23,7 +23,7 @@
   PrintLib
   DebugLib
   FileHandleLib
-  StackCheckLib 
+  StackCheckLib
   StackCheckFailureHookLib
 
 [Protocols]
