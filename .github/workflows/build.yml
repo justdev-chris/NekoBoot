@@ -50,10 +50,6 @@ jobs:
           cp $EDK_TOOLS_PATH/Conf/tools_def.template $CONF_PATH/tools_def.txt
           cp $EDK_TOOLS_PATH/Conf/target.template $CONF_PATH/target.txt
 
-      - name: Find FileHandleLib
-        run: |
-          find edk2 -name "*FileHandleLib*.inf" 2>/dev/null | head -10
-
       # 6. Build NekoBoot
       - name: Build NekoBoot
         run: |
@@ -62,16 +58,44 @@ jobs:
           cp -r NekoPlatform edk2/
           cd edk2
           source edksetup.sh
-          build -p NekoPlatform/NekoPlatform.dsc -a X64 -t GCC5 -b DEBUG  # <-- No -m flag!
-          echo "Build step finished. Output:"
-          find Build -name "*.efi" 2>/dev/null || echo "No .efi file found."
+          build -p NekoPlatform/NekoPlatform.dsc -a X64 -t GCC5 -b DEBUG
+          
+          # Find and copy the EFI file to workspace root
+          echo "🔍 Searching for built EFI file..."
+          find . -name "NekoBoot.efi" -type f | head -5
+          
+          # Try all possible locations
+          if [ -f "Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot.efi" ]; then
+            echo "📁 Found in: Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot.efi"
+            cp Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot.efi ../NekoBoot.efi
+          elif [ -f "Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/OUTPUT/NekoBoot.efi" ]; then
+            echo "📁 Found in: Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/OUTPUT/NekoBoot.efi"
+            cp Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/OUTPUT/NekoBoot.efi ../NekoBoot.efi
+          elif [ -f "Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/DEBUG/NekoBoot.efi" ]; then
+            echo "📁 Found in: Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/DEBUG/NekoBoot.efi"
+            cp Build/NekoPlatform/DEBUG_GCC5/X64/NekoBoot/NekoBoot/DEBUG/NekoBoot.efi ../NekoBoot.efi
+          else
+            # Last resort: find any NekoBoot.efi
+            echo "🔎 Searching recursively..."
+            EFI_PATH=$(find . -name "NekoBoot.efi" -type f | head -1)
+            if [ -n "$EFI_PATH" ]; then
+              echo "📁 Found in: $EFI_PATH"
+              cp "$EFI_PATH" ../NekoBoot.efi
+            else
+              echo "❌ ERROR: NekoBoot.efi not found!"
+              echo "Listing all EFI files:"
+              find . -name "*.efi" -type f 2>/dev/null
+              exit 1
+            fi
+          fi
+          
+          cd ..
+          echo "✅ Successfully copied NekoBoot.efi"
+          ls -la NekoBoot.efi
 
       # 7. Upload build artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: NekoBoot
-          path: |      
-            Build/**/NekoBoot.efi
-            Build/**/DEBUG/NekoBoot.efi
-            Build/**/OUTPUT/NekoBoot.efi     
+          path: NekoBoot.efi
