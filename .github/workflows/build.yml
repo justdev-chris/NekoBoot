@@ -62,7 +62,7 @@ jobs:
           cp -r NekoPlatform edk2/
           cd edk2
           source edksetup.sh
-          build -p NekoPlatform/NekoPlatform.dsc -m NekoBoot/NekoBoot.inf -a X64 -t GCC5 -b DEBUG
+          build -p NekoPlatform/NekoPlatform.dsc -a X64 -t GCC5 -b DEBUG  # <-- No -m flag!
           echo "Build step finished. Output:"
           find Build -name "*.efi" 2>/dev/null || echo "No .efi file found."
 
