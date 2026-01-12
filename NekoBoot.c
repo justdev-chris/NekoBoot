@@ -135,7 +135,6 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
     
     // BMP is stored bottom-to-top, need to flip vertically
     // Also convert transparency (white pixels) to black
-    UINT8 *Src = PixelData;
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Dst = BltBuffer;
     
     // Calculate row size with padding
