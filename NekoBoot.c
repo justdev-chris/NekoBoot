@@ -1,13 +1,14 @@
 #include <Uefi.h>
-#include <Library/UefiBootServicesTableLib.h>
+
 #include <Library/UefiLib.h>
+#include <Library/UefiBootServicesTableLib.h>
 #include <Library/MemoryAllocationLib.h>
+#include <Library/BaseMemoryLib.h>
+#include <Library/BaseLib.h>
+
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleFileSystem.h>
 #include <Protocol/LoadedImage.h>
-#include <Library/BaseMemoryLib.h>
-#include <Library/BaseLib.h>
-#include <Library/FileHandleLib.h>
 
 #pragma pack(1)
 typedef struct {
@@ -34,195 +35,162 @@ typedef struct {
 #pragma pack()
 
 EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
-    EFI_STATUS                      Status;
-    EFI_LOADED_IMAGE_PROTOCOL       *LoadedImage;
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *FileSystem;
-    EFI_FILE_HANDLE                 Volume, FileHandle;
-    EFI_GRAPHICS_OUTPUT_PROTOCOL    *GraphicsOutput;
-    UINTN                           FileSize, ReadSize;
-    UINT8                           *FileBuffer = NULL;
-    BMP_FILE_HEADER                 *BmpFileHeader;
-    BMP_INFO_HEADER                 *BmpInfoHeader;
-    UINT8                           *PixelData;
-    UINT32                          DestinationX, DestinationY;
-
-    // 1. Get the loaded image protocol to find our device
-    Status = gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (VOID**)&LoadedImage);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to get LoadedImage: %r\n", Status);
-        return Status;
-    }
-
-    // 2. Get the file system on the device where our app is loaded
-    Status = gBS->HandleProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid, (VOID**)&FileSystem);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to get FileSystem: %r\n", Status);
-        return Status;
-    }
-
-    // 3. Open the root directory
-    Status = FileSystem->OpenVolume(FileSystem, &Volume);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to open volume: %r\n", Status);
-        return Status;
-    }
-
-    // 4. Open the BMP file
-    Status = Volume->Open(Volume, &FileHandle, FileName, EFI_FILE_MODE_READ, 0);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to open file %s: %r\n", FileName, Status);
-        Volume->Close(Volume);
-        return Status;
-    }
-
-    // 5. Get file size and read entire file
-    EFI_FILE_INFO *FileInfo;
-    UINTN InfoSize = sizeof(EFI_FILE_INFO) + 128;
-    FileInfo = AllocatePool(InfoSize);
-    Status = FileHandle->GetInfo(FileHandle, &gEfiFileInfoGuid, &InfoSize, FileInfo);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to get file info: %r\n", Status);
-        goto CLEANUP_FILE;
-    }
-    FileSize = FileInfo->FileSize;
-    FreePool(FileInfo);
-
-    FileBuffer = AllocatePool(FileSize);
-    ReadSize = FileSize;
-    Status = FileHandle->Read(FileHandle, &ReadSize, FileBuffer);
-    if (EFI_ERROR(Status) || ReadSize != FileSize) {
-        Print(L"Failed to read file: %r (read %lu of %lu)\n", Status, ReadSize, FileSize);
-        goto CLEANUP_BUFFER;
-    }
-
-    // 6. Parse BMP headers
-    BmpFileHeader = (BMP_FILE_HEADER *)FileBuffer;
-    BmpInfoHeader = (BMP_INFO_HEADER *)(FileBuffer + sizeof(BMP_FILE_HEADER));
-    PixelData = FileBuffer + BmpFileHeader->bfOffBits;
-
-    // Validate BMP (basic checks)
-    if (BmpFileHeader->bfType != 0x4D42) { // "BM"
-        Print(L"Not a valid BMP file\n");
-        Status = EFI_UNSUPPORTED;
-        goto CLEANUP_BUFFER;
-    }
-    if (BmpInfoHeader->biBitCount != 24) {
-        Print(L"Only 24-bit BMP supported\n");
-        Status = EFI_UNSUPPORTED;
-        goto CLEANUP_BUFFER;
-    }
-
-    // 7. Get graphics protocol
-    Status = gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID**)&GraphicsOutput);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to get GraphicsOutput: %r\n", Status);
-        goto CLEANUP_BUFFER;
-    }
-
-    // 8. Center the image on screen
-    DestinationX = (GraphicsOutput->Mode->Info->HorizontalResolution - BmpInfoHeader->biWidth) / 2;
-    DestinationY = (GraphicsOutput->Mode->Info->VerticalResolution - BmpInfoHeader->biHeight) / 2;
-
-    // 9. Draw the BMP using GraphicsOutput->Blt
-    // Convert 24-bit BGR to 32-bit BGRx pixel format
-    UINTN PixelCount = BmpInfoHeader->biWidth * BmpInfoHeader->biHeight;
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer = AllocatePool(PixelCount * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-    
-    if (BltBuffer == NULL) {
-        Status = EFI_OUT_OF_RESOURCES;
-        goto CLEANUP_BUFFER;
-    }
-    
-    // Convert 24-bit BGR to 32-bit BGRx (UEFI pixel format)
-    UINT8 *Src = PixelData;
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Dst = BltBuffer;
-    for (UINTN i = 0; i < PixelCount; i++) {
-        Dst->Blue  = Src[0];
-        Dst->Green = Src[1];
-        Dst->Red   = Src[2];
-        Dst->Reserved = 0;
-        Src += 3;
-        Dst++;
-    }
-    
-    Status = GraphicsOutput->Blt(
-        GraphicsOutput,
-        BltBuffer,
-        EfiBltBufferToVideo,
-        0, 0,                                 // SourceX, SourceY
-        DestinationX, DestinationY,           // DestinationX, DestinationY
-        BmpInfoHeader->biWidth,               // Width
-        BmpInfoHeader->biHeight,              // Height
-        0                                     // Delta (0 for BltBuffer)
-    );
-    
-    FreePool(BltBuffer);
-    if (EFI_ERROR(Status)) {
-        Print(L"GraphicsOutput->Blt failed: %r\n", Status);
-        goto CLEANUP_BUFFER;
-    }
-
-    Print(L"BMP displayed successfully at %ux%u\n", DestinationX, DestinationY);
-    Status = EFI_SUCCESS;
-
-CLEANUP_BUFFER:
-    if (FileBuffer) FreePool(FileBuffer);
-CLEANUP_FILE:
-    FileHandle->Close(FileHandle);
-    Volume->Close(Volume);
-    return Status;
-}
-
-EFI_STATUS ChainloadWindows(EFI_HANDLE ImageHandle) {
     EFI_STATUS Status;
     EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
-    EFI_HANDLE WinHandle = NULL;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *FileSystem;
+    EFI_FILE_HANDLE Volume, File;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *GOP;
 
-    // Locate our own loaded image protocol
-    Status = gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (VOID**)&LoadedImage);
+    UINT8 *FileBuffer = NULL;
+    UINTN FileSize;
+
+    Status = gBS->HandleProtocol(
+        ImageHandle,
+        &gEfiLoadedImageProtocolGuid,
+        (VOID**)&LoadedImage
+    );
     if (EFI_ERROR(Status)) return Status;
 
-    // Load the Windows Boot Manager from the same device
-    CHAR16 *WinBootPath = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
-    Status = gBS->LoadImage(
-        FALSE,                    // BootPolicy
-        ImageHandle,              // ParentImageHandle
-        NULL,                     // DevicePath (NULL = use LoadedImage->DeviceHandle)
-        WinBootPath,              // FilePath
-        0,                        // SourceSize
-        &WinHandle                // ImageHandle
+    Status = gBS->HandleProtocol(
+        LoadedImage->DeviceHandle,
+        &gEfiSimpleFileSystemProtocolGuid,
+        (VOID**)&FileSystem
     );
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to load Windows: %r\n", Status);
-        return Status;
+    if (EFI_ERROR(Status)) return Status;
+
+    Status = FileSystem->OpenVolume(FileSystem, &Volume);
+    if (EFI_ERROR(Status)) return Status;
+
+    Status = Volume->Open(
+        Volume,
+        &File,
+        FileName,
+        EFI_FILE_MODE_READ,
+        0
+    );
+    if (EFI_ERROR(Status)) return Status;
+
+    EFI_FILE_INFO *Info;
+    UINTN InfoSize = sizeof(EFI_FILE_INFO) + 200;
+    Info = AllocatePool(InfoSize);
+
+    Status = File->GetInfo(File, &gEfiFileInfoGuid, &InfoSize, Info);
+    if (EFI_ERROR(Status)) return Status;
+
+    FileSize = Info->FileSize;
+    FreePool(Info);
+
+    FileBuffer = AllocatePool(FileSize);
+    File->Read(File, &FileSize, FileBuffer);
+    File->Close(File);
+    Volume->Close(Volume);
+
+    BMP_FILE_HEADER *FH = (BMP_FILE_HEADER*)FileBuffer;
+    BMP_INFO_HEADER *IH = (BMP_INFO_HEADER*)(FileBuffer + sizeof(BMP_FILE_HEADER));
+
+    if (FH->bfType != 0x4D42 || IH->biBitCount != 24) {
+        FreePool(FileBuffer);
+        return EFI_UNSUPPORTED;
     }
 
-    // Start Windows Boot Manager
-    Status = gBS->StartImage(WinHandle, NULL, NULL);
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to start Windows: %r\n", Status);
-        return Status;
+    Status = gBS->LocateProtocol(
+        &gEfiGraphicsOutputProtocolGuid,
+        NULL,
+        (VOID**)&GOP
+    );
+    if (EFI_ERROR(Status)) return Status;
+
+    UINT32 Width = IH->biWidth;
+    UINT32 Height = IH->biHeight;
+
+    UINT32 ScreenW = GOP->Mode->Info->HorizontalResolution;
+    UINT32 ScreenH = GOP->Mode->Info->VerticalResolution;
+
+    UINT32 DestX = (ScreenW - Width) / 2;
+    UINT32 DestY = (ScreenH - Height) / 2;
+
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Blt =
+        AllocatePool(Width * Height * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+
+    UINT8 *PixelData = FileBuffer + FH->bfOffBits;
+
+    // --- FIX 1: BMP upside-down + fake transparency ---
+    for (UINT32 y = 0; y < Height; y++) {
+        UINT8 *SrcRow = PixelData + (Height - 1 - y) * Width * 3;
+        for (UINT32 x = 0; x < Width; x++) {
+            UINT8 B = SrcRow[x * 3 + 0];
+            UINT8 G = SrcRow[x * 3 + 1];
+            UINT8 R = SrcRow[x * 3 + 2];
+
+            EFI_GRAPHICS_OUTPUT_BLT_PIXEL *P =
+                &Blt[y * Width + x];
+
+            // White → black (fake transparency)
+            if (R > 245 && G > 245 && B > 245) {
+                P->Red = P->Green = P->Blue = 0;
+            } else {
+                P->Red = R;
+                P->Green = G;
+                P->Blue = B;
+            }
+            P->Reserved = 0;
+        }
     }
+
+    GOP->Blt(
+        GOP,
+        Blt,
+        EfiBltBufferToVideo,
+        0, 0,
+        DestX, DestY,
+        Width, Height,
+        0
+    );
+
+    FreePool(Blt);
+    FreePool(FileBuffer);
+
+    // --- FIX 3: centered text ---
+    UINTN Cols = GOP->Mode->Info->HorizontalResolution / 8;
+    UINTN Rows = GOP->Mode->Info->VerticalResolution / 16;
+
+    UINTN TextX = (Cols - 22) / 2;
+    UINTN TextY = (DestY + Height + 20) / 16;
+
+    gST->ConOut->SetCursorPosition(gST->ConOut, TextX, TextY);
+    Print(L"Booting up Neko OS...");
 
     return EFI_SUCCESS;
 }
 
-EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
-    Print(L"Booting Neko OS...\n");
+EFI_STATUS ChainloadWindows(EFI_HANDLE ImageHandle) {
+    EFI_STATUS Status;
+    EFI_HANDLE WinHandle = NULL;
 
-    EFI_STATUS Status = DrawBMP(ImageHandle, L"nekologo.bmp");
-    if (EFI_ERROR(Status)) {
-        Print(L"Failed to draw BMP: %r\n", Status);
-    }
+    CHAR16 *WinPath = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
 
-    // Show logo for 5 sec
-    gBS->Stall(5000000);
+    Status = gBS->LoadImage(
+        FALSE,
+        ImageHandle,
+        NULL,
+        WinPath,
+        0,
+        &WinHandle
+    );
+    if (EFI_ERROR(Status)) return Status;
 
-    // Now chainload Windows
-    Status = ChainloadWindows(ImageHandle);
-    if (EFI_ERROR(Status)) {
-        Print(L"Windows boot failed: %r\n", Status);
-    }
+    return gBS->StartImage(WinHandle, NULL, NULL);
+}
 
+EFI_STATUS EFIAPI UefiMain(
+    IN EFI_HANDLE ImageHandle,
+    IN EFI_SYSTEM_TABLE *SystemTable
+) {
+    DrawBMP(ImageHandle, L"nekologo.bmp");
+
+    // --- FIX 2: 10 second delay ---
+    gBS->Stall(10 * 1000 * 1000);
+
+    ChainloadWindows(ImageHandle);
     return EFI_SUCCESS;
 }
