@@ -35,10 +35,10 @@ typedef struct {
 
 EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
     EFI_STATUS                      Status;
-    EFI_LOADED_IMAGE_PROTOCOL       *LoadedImage;
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *FileSystem;
-    EFI_FILE_HANDLE                 Volume, FileHandle;
-    EFI_GRAPHICS_OUTPUT_PROTOCOL    *GraphicsOutput;
+    EFI_LOADED_IMAGE_PROTOCOL       *LoadedImage = NULL;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *FileSystem = NULL;
+    EFI_FILE_HANDLE                 Volume = NULL, FileHandle = NULL;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL    *GraphicsOutput = NULL;
     UINTN                           FileSize, ReadSize;
     UINT8                           *FileBuffer = NULL;
     BMP_FILE_HEADER                 *BmpFileHeader;
@@ -79,15 +79,26 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
     EFI_FILE_INFO *FileInfo;
     UINTN InfoSize = sizeof(EFI_FILE_INFO) + 128;
     FileInfo = AllocatePool(InfoSize);
+    if (FileInfo == NULL) {
+        Status = EFI_OUT_OF_RESOURCES;
+        goto CLEANUP_FILE;
+    }
+    
     Status = FileHandle->GetInfo(FileHandle, &gEfiFileInfoGuid, &InfoSize, FileInfo);
     if (EFI_ERROR(Status)) {
         Print(L"Failed to get file info: %r\n", Status);
+        FreePool(FileInfo);
         goto CLEANUP_FILE;
     }
     FileSize = FileInfo->FileSize;
     FreePool(FileInfo);
 
     FileBuffer = AllocatePool(FileSize);
+    if (FileBuffer == NULL) {
+        Status = EFI_OUT_OF_RESOURCES;
+        goto CLEANUP_FILE;
+    }
+    
     ReadSize = FileSize;
     Status = FileHandle->Read(FileHandle, &ReadSize, FileBuffer);
     if (EFI_ERROR(Status) || ReadSize != FileSize) {
@@ -98,6 +109,14 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
     // 6. Parse BMP headers
     BmpFileHeader = (BMP_FILE_HEADER *)FileBuffer;
     BmpInfoHeader = (BMP_INFO_HEADER *)(FileBuffer + sizeof(BMP_FILE_HEADER));
+    
+    // Validate offsets
+    if (BmpFileHeader->bfOffBits >= FileSize) {
+        Print(L"Invalid BMP offset\n");
+        Status = EFI_UNSUPPORTED;
+        goto CLEANUP_BUFFER;
+    }
+    
     PixelData = FileBuffer + BmpFileHeader->bfOffBits;
 
     // Validate BMP (basic checks)
@@ -119,9 +138,9 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
         goto CLEANUP_BUFFER;
     }
 
-    // 8. Center the image on screen
+    // 8. Center the image on screen (slightly up - at 40% from top instead of 50%)
     DestinationX = (GraphicsOutput->Mode->Info->HorizontalResolution - BmpInfoHeader->biWidth) / 2;
-    DestinationY = (GraphicsOutput->Mode->Info->VerticalResolution - BmpInfoHeader->biHeight) / 2;
+    DestinationY = (GraphicsOutput->Mode->Info->VerticalResolution - BmpInfoHeader->biHeight) / 4; // 1/4 from top
 
     // 9. Draw the BMP using GraphicsOutput->Blt
     // Convert 24-bit BGR to 32-bit BGRx pixel format
@@ -182,14 +201,13 @@ EFI_STATUS DrawBMP(EFI_HANDLE ImageHandle, CHAR16 *FileName) {
         goto CLEANUP_BUFFER;
     }
 
-    Print(L"BMP displayed successfully at %ux%u\n", DestinationX, DestinationY);
     Status = EFI_SUCCESS;
 
 CLEANUP_BUFFER:
     if (FileBuffer) FreePool(FileBuffer);
 CLEANUP_FILE:
-    FileHandle->Close(FileHandle);
-    Volume->Close(Volume);
+    if (FileHandle) FileHandle->Close(FileHandle);
+    if (Volume) Volume->Close(Volume);
     return Status;
 }
 
@@ -228,26 +246,57 @@ EFI_STATUS ChainloadWindows(EFI_HANDLE ImageHandle) {
 }
 
 EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
-    // Clear screen and position cursor near center
-    Print(L"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+    EFI_STATUS Status;
+    UINTN MaxCol, MaxRow;
     
-    // Draw centered text before BMP
-    Print(L"                                      Booting Neko OS...\n\n");
-
-    EFI_STATUS Status = DrawBMP(ImageHandle, L"nekologo.bmp");
+    // Clear screen
+    SystemTable->ConOut->ClearScreen(SystemTable->ConOut);
+    
+    // Draw BMP logo (centered, slightly up)
+    Status = DrawBMP(ImageHandle, L"nekologo.bmp");
     if (EFI_ERROR(Status)) {
-        Print(L"Failed to draw BMP: %r\n", Status);
+        // If BMP fails, just continue with text
+        Print(L"Failed to draw logo: %r\n", Status);
     }
-
-    // Show logo for 10 seconds
-    Print(L"\n\n");
-    gBS->Stall(10000000);  // 10 seconds
-
-    // Now chainload Windows
+    
+    // Get console dimensions
+    Status = SystemTable->ConOut->QueryMode(SystemTable->ConOut, 
+                                           SystemTable->ConOut->Mode->Mode, 
+                                           &MaxCol, &MaxRow);
+    if (EFI_ERROR(Status)) {
+        // Default values if query fails
+        MaxCol = 80;
+        MaxRow = 25;
+    }
+    
+    // Position text: slightly down (3/4 from top), centered
+    // "Booting Up NekoOS" is 19 characters
+    UINTN TextRow = (MaxRow * 3) / 4;  // 75% down the screen
+    UINTN TextCol = (MaxCol - 19) / 2; // Center the 19-character string
+    
+    // Ensure we're within bounds
+    if (TextCol > MaxCol) TextCol = 0;
+    if (TextRow > MaxRow) TextRow = MaxRow - 1;
+    
+    // Move cursor and display text
+    SystemTable->ConOut->SetCursorPosition(SystemTable->ConOut, TextCol, TextRow);
+    Print(L"Booting Up NekoOS");
+    
+    // Wait for 5 seconds
+    gBS->Stall(5000000);
+    
+    // Clear the text
+    SystemTable->ConOut->SetCursorPosition(SystemTable->ConOut, TextCol, TextRow);
+    Print(L"                   ");  // 19 spaces to clear
+    
+    // Chainload Windows
     Status = ChainloadWindows(ImageHandle);
     if (EFI_ERROR(Status)) {
-        Print(L"Windows boot failed: %r\n", Status);
+        // Display error at bottom
+        SystemTable->ConOut->SetCursorPosition(SystemTable->ConOut, 0, MaxRow - 1);
+        Print(L"Windows boot failed: %r", Status);
+        gBS->Stall(3000000);  // Show error for 3 seconds
     }
 
-    return EFI_SUCCESS;
+    return Status;
 }
