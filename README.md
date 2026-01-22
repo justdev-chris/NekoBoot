@@ -49,9 +49,9 @@ No local build environment is required.
 
 ## 🚀 Usage
 
-1. Copy `NekoBoot.efi` to a USB drive or EFI System Partition:
+1. Copy `NekoBoot.efi` to a USB drive or EFI System Partition and rename to `BOOTX64.efi`:
 
-EFI/NekoBoot/NekoBoot.efi
+EFI/BOOT/BOOTX64.efi
 
 2. Boot from it using your system’s UEFI boot menu
 
